@@ -1,0 +1,13 @@
+# Cache do FastF1 (NÃO REMOVA ESTA LINHA)
+cache/
+__pycache__/
+
+# Arquivos de ambiente virtual (se você usar)
+venv/
+.env
+
+# Arquivos de sistema e IDE
+.DS_Store
+.vscode/
+
+.idea/
