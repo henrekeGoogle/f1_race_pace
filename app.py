@@ -39,9 +39,10 @@ def formato_f1(x, pos):
 
 # --- SIDEBAR ---
 st.sidebar.header("Configurações da Sessão")
-ano_selecionado = st.sidebar.selectbox("Ano", [2025,2024, 2023, 2022])
+ano_selecionado = st.sidebar.selectbox("Ano", [2025, 2024, 2023, 2022])
 gp_selecionado = st.sidebar.selectbox("Grand Prix",
-                                      ["Bahrain", "Saudi Arabia", "Australia", "Japan", "Brazil", "Las Vegas","BRITISH","HUNGARY"])
+                                      ["Bahrain", "Saudi Arabia", "Australia","CHINA", "Japan", "Great Britain", "Hungary",
+                                       "Brazil", "Las Vegas"])
 sessao_selecionada = st.sidebar.selectbox("Sessão", ["FP1", "FP2", "FP3", "Q", "R"])
 
 st.sidebar.markdown("---")
@@ -75,8 +76,10 @@ if 'session_data' in st.session_state:
 
     if st.button("Comparar Ritmo e Analisar Combustível"):
 
-        aba_pace, aba_telemetry, aba_ranking = st.tabs(
-            ["⏱️ Ritmo de Corrida", "🏎️ Telemetria", "🏆 Ranking & Combustível"])
+        # --- 4 ABAS ---
+        aba_pace, aba_telemetry, aba_ranking, aba_peso_tempo = st.tabs([
+            "⏱️ Ritmo de Corrida", "🏎️ Telemetria", "🏆 Ranking Bruto", "⚖️ Equalizador de Peso"
+        ])
 
         fig_pace, ax_pace = plt.subplots(figsize=(10, 6))
         fig_telemetry, ax_telemetry = plt.subplots(figsize=(10, 6))
@@ -152,7 +155,6 @@ if 'session_data' in st.session_state:
                             media_segundos = voltas_validas['LapTime'].dt.total_seconds().mean()
                             vida_final_pneu = int(clean_laps['TyreLife'].max())
 
-                            # --- CÁLCULO DO DELTA SOFT E COMBUSTÍVEL ---
                             if tempo_best_soft:
                                 diff_total = media_segundos - tempo_best_soft
                                 delta_soft_str = f"+{diff_total:.3f}s"
@@ -180,13 +182,13 @@ if 'session_data' in st.session_state:
                                 'Voltas': len(voltas_validas),
                                 'Vida Max': vida_final_pneu,
                                 'media_raw': media_segundos,
-                                'Ritmo Médio': formato_f1(media_segundos, None),
+                                'Ritmo Real (Médio)': formato_f1(media_segundos, None),
                                 'Delta Soft': delta_soft_str,
                                 'Combustível (kg)': peso_estimado
                             })
 
             # ==========================================
-            # 3. RENDERIZAÇÃO
+            # 3. RENDERIZAÇÃO ABAS 1 E 2
             # ==========================================
             ax_pace.yaxis.set_major_formatter(ticker.FuncFormatter(formato_f1))
             ax_pace.set_title(
@@ -207,17 +209,19 @@ if 'session_data' in st.session_state:
             with aba_telemetry:
                 st.pyplot(fig_telemetry)
 
-            with aba_ranking:
-                if dados_ranking:
-                    df_ranking = pd.DataFrame(dados_ranking)
-                    df_ranking = df_ranking.sort_values(by='media_raw', ascending=True)
+            # ==========================================
+            # 4. RENDERIZAÇÃO ABAS 3 E 4
+            # ==========================================
+            if dados_ranking:
+                df_ranking = pd.DataFrame(dados_ranking)
+                df_ranking = df_ranking.sort_values(by='media_raw', ascending=True)
 
-                    st.markdown("### 🏆 Análise de Ritmo por Composto")
+                peso_min_global = df_ranking['Combustível (kg)'].min()
+                peso_max_global = df_ranking['Combustível (kg)'].max()
 
-                    # --- A MÁGICA GLOBAL ACONTECE AQUI ---
-                    # Calcula o mínimo e máximo absoluto de combustível na sessão inteira
-                    peso_min_global = df_ranking['Combustível (kg)'].min()
-                    peso_max_global = df_ranking['Combustível (kg)'].max()
+                # Renderiza Aba 3: Ranking Bruto
+                with aba_ranking:
+                    st.markdown("### 🏆 Ranking Bruto de Ritmo por Composto")
 
                     compostos_encontrados = df_ranking['Pneu'].unique()
 
@@ -229,8 +233,8 @@ if 'session_data' in st.session_state:
                             gaps = ["Líder" if t == tempo_lider else f"+{(t - tempo_lider):.3f}s" for t in
                                     df_comp['media_raw']]
 
-                            idx_ritmo = df_comp.columns.get_loc('Ritmo Médio')
-                            df_comp.insert(idx_ritmo + 1, 'Gap', gaps)
+                            idx_ritmo = df_comp.columns.get_loc('Ritmo Real (Médio)')
+                            df_comp.insert(idx_ritmo + 1, 'Gap Bruto', gaps)
 
                             df_comp = df_comp.drop(columns=['media_raw', 'Pneu']).reset_index(drop=True)
                             df_comp.index = df_comp.index + 1
@@ -239,25 +243,108 @@ if 'session_data' in st.session_state:
                                 f"#### {'🟡' if comp == 'MEDIUM' else '⚪' if comp == 'HARD' else '🔴'} Pneu {comp}")
 
                             if df_comp['Combustível (kg)'].notna().any():
-                                # Adicionamos vmin e vmax travados nos extremos globais
                                 df_styled = df_comp.style.background_gradient(
-                                    subset=['Combustível (kg)'],
-                                    cmap='coolwarm',
-                                    vmin=peso_min_global,
+                                    subset=['Combustível (kg)'], cmap='coolwarm', vmin=peso_min_global,
                                     vmax=peso_max_global
-                                ).format(
-                                    {'Combustível (kg)': "{:.1f} kg"},
-                                    na_rep="Inconclusivo"
-                                )
+                                ).format({'Combustível (kg)': "{:.1f} kg"}, na_rep="Inconclusivo")
                             else:
-                                df_styled = df_comp.style.format(
-                                    {'Combustível (kg)': "{:.1f} kg"},
-                                    na_rep="Inconclusivo"
-                                )
+                                df_styled = df_comp.style.format({'Combustível (kg)': "{:.1f} kg"},
+                                                                 na_rep="Inconclusivo")
 
                             st.dataframe(df_styled, use_container_width=True)
-                else:
-                    st.warning("Nenhum piloto atendeu aos critérios mínimos.")
+
+                # Renderiza Aba 4: Gráfico Peso x Tempo + TABELA EQUALIZADA
+                with aba_peso_tempo:
+                    st.markdown("### ⚖️ Gráfico: Carga de Combustível vs Ritmo Bruto")
+
+                    df_grafico = df_ranking.dropna(subset=['Combustível (kg)']).copy()
+
+                    if not df_grafico.empty:
+                        # 1. Gráfico
+                        if peso_max_global > peso_min_global:
+                            df_grafico['Carga Normalizada'] = (df_grafico['Combustível (kg)'] - peso_min_global) / (
+                                        peso_max_global - peso_min_global)
+                        else:
+                            df_grafico['Carga Normalizada'] = 0.5
+
+                        fig_pt, ax_pt = plt.subplots(figsize=(10, 6))
+                        cores_pneus = {'SOFT': '#FF3333', 'MEDIUM': '#FFD100', 'HARD': '#DDDDDD'}
+
+                        sns.scatterplot(
+                            data=df_grafico, x='Carga Normalizada', y='media_raw', hue='Pneu',
+                            palette=cores_pneus, s=150, edgecolor='black', alpha=0.8, ax=ax_pt
+                        )
+
+                        for i, row in df_grafico.iterrows():
+                            ax_pt.text(row['Carga Normalizada'] + 0.015, row['media_raw'], row['Piloto'], fontsize=9,
+                                       fontweight='bold', alpha=0.8)
+
+                        ax_pt.yaxis.set_major_formatter(ticker.FuncFormatter(formato_f1))
+                        ax_pt.set_xlabel("Índice de Carga Estimada (0.0 = Mais Leve, 1.0 = Mais Pesado)")
+                        ax_pt.set_ylabel("Ritmo Médio Bruto")
+                        ax_pt.grid(True, linestyle='--', alpha=0.4)
+                        ax_pt.set_xlim(-0.1, 1.1)
+                        ax_pt.invert_yaxis()
+
+                        st.pyplot(fig_pt)
+
+                        # ==========================================
+                        # A NOVA TABELA EQUALIZADA (CORREÇÃO PELO MAIS PESADO)
+                        # ==========================================
+                        st.markdown("---")
+                        st.markdown(f"### 🏁 Ordem de Forças Real (Ritmo Equalizado)")
+                        st.markdown(
+                            f"*(Simulando que todos os carros começaram com **{peso_max_global:.1f} kg**, que foi a carga máxima detectada na sessão).*")
+
+                        # Prepara a tabela corrigida
+                        df_corrigida = df_grafico.copy()
+
+                        # Matemática: Quantos Kg de diferença para o líder de peso?
+                        df_corrigida['Diferença Peso (kg)'] = peso_max_global - df_corrigida['Combustível (kg)']
+
+                        # Penalidade de Tempo = (Diferença em Kg / 10) * Valor do Slidder
+                        df_corrigida['Penalidade Tempo'] = (df_corrigida['Diferença Peso (kg)'] / 10) * peso_10kg
+
+                        # O Ritmo Corrigido em segundos brutos
+                        df_corrigida['Ritmo Corrigido (Raw)'] = df_corrigida['media_raw'] + df_corrigida[
+                            'Penalidade Tempo']
+
+                        # Ordena a tabela do mais rápido pro mais lento (já com os tempos corrigidos)
+                        df_corrigida = df_corrigida.sort_values(by='Ritmo Corrigido (Raw)', ascending=True).reset_index(
+                            drop=True)
+
+                        # Calcula os Gaps Equalizados
+                        tempo_lider_corrigido = df_corrigida['Ritmo Corrigido (Raw)'].iloc[0]
+                        gaps_corrigidos = [
+                            "Líder" if t == tempo_lider_corrigido else f"+{(t - tempo_lider_corrigido):.3f}s" for t in
+                            df_corrigida['Ritmo Corrigido (Raw)']]
+
+                        # Formatação para o usuário ver
+                        df_corrigida['Gap Equalizado'] = gaps_corrigidos
+                        df_corrigida['Ritmo Equalizado'] = df_corrigida['Ritmo Corrigido (Raw)'].apply(
+                            lambda x: formato_f1(x, None))
+                        df_corrigida['Penalidade Aplicada'] = df_corrigida['Penalidade Tempo'].apply(
+                            lambda x: f"+{x:.3f}s" if x > 0 else "Base (Mais Pesado)")
+
+                        # Seleciona só as colunas que importam para a tela
+                        colunas_exibir = ['Piloto', 'Pneu', 'Combustível (kg)', 'Ritmo Real (Médio)',
+                                          'Penalidade Aplicada', 'Ritmo Equalizado', 'Gap Equalizado']
+                        df_tela = df_corrigida[colunas_exibir]
+                        df_tela.index = df_tela.index + 1
+
+                        # Renderiza com o mapa de cores no combustível para manter a identidade visual
+                        df_tela_styled = df_tela.style.background_gradient(
+                            subset=['Combustível (kg)'], cmap='coolwarm', vmin=peso_min_global, vmax=peso_max_global
+                        ).format({'Combustível (kg)': "{:.1f} kg"})
+
+                        st.dataframe(df_tela_styled, use_container_width=True)
+
+                    else:
+                        st.warning(
+                            "Não há dados de combustível suficientes para gerar o gráfico e a tabela equalizada.")
+
+            else:
+                st.warning("Nenhum piloto atendeu aos critérios mínimos de análise.")
 
 else:
     st.info("👈 Selecione um GP e clique em 'Carregar Sessão' para começar.")
