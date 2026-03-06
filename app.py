@@ -39,7 +39,7 @@ def formato_f1(x, pos):
 
 # --- SIDEBAR ---
 st.sidebar.header("Configurações da Sessão")
-ano_selecionado = st.sidebar.selectbox("Ano", [2025, 2024, 2023, 2022])
+ano_selecionado = st.sidebar.selectbox("Ano", [2026,2025, 2024, 2023, 2022])
 gp_selecionado = st.sidebar.selectbox("Grand Prix",
                                       ["Bahrain", "Saudi Arabia", "Australia","CHINA", "Japan", "Great Britain", "Hungary",
                                        "Brazil", "Las Vegas"])
@@ -348,3 +348,4 @@ if 'session_data' in st.session_state:
 
 else:
     st.info("👈 Selecione um GP e clique em 'Carregar Sessão' para começar.")
+
