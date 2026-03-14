@@ -43,7 +43,7 @@ ano_selecionado = st.sidebar.selectbox("Ano", [2026,2025, 2024, 2023, 2022])
 gp_selecionado = st.sidebar.selectbox("Grand Prix",
                                       ["Bahrain", "Saudi Arabia", "Australia","CHINA", "Japan", "Great Britain", "Hungary",
                                        "Brazil", "Las Vegas"])
-sessao_selecionada = st.sidebar.selectbox("Sessão", ["FP1", "FP2", "FP3", "Q", "R"])
+sessao_selecionada = st.sidebar.selectbox("Sessão", ["FP1", "FP2", "FP3", "Q", "R","S"])
 
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ Parâmetros de Engenharia")
